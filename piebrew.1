@@ -1,0 +1,135 @@
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\" Copyright (c) 2026 The Piebrew authors
+.Dd October 23, 2026
+.Dt PIEBREW 1
+.Os
+.Sh NAME
+.Nm piebrew
+.Nd Homebrew bottles installed as dpkg packages
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Cm install
+.Op Fl n
+.Op Fl -reinstall
+.Op Fl -force
+.Op Fl -keep-deb
+.Op Fl -tag Ar tag
+.Ar formula ...
+.Nm
+.Cm remove Ns | Ns Cm uninstall
+.Ar formula ...
+.Nm
+.Cm list
+.Nm
+.Cm info
+.Ar formula
+.Nm
+.Cm outdated
+.Nm
+.Cm upgrade
+.Op Fl n
+.Op Ar formula ...
+.Sh DESCRIPTION
+.Nm
+installs programs from Homebrew's arm64 bottles.
+It asks Homebrew's API for the formula, fetches its bottle into memory
+and checks its SHA-256, and makes a Debian package of it there, without
+unpacking anything to disk: the keg in
+.Pa /opt/homebrew/Cellar/ Ns Ar formula Ns / Ns Ar version ,
+its placeholders relocated as
+.Xr brew 1
+would, each Mach-O file signed again (ad hoc, with 4 KB pages), and
+the symlinks
+.Cm brew link
+makes in
+.Pa /opt/homebrew/bin ,
+.Pa lib ,
+.Pa share
+and the others (none for a keg-only formula), and
+.Pa /opt/homebrew/opt/ Ns Ar formula .
+The package is named
+.Sy brew- Ns Ar formula
+and is installed with
+.Xr dpkg 1 ,
+so dpkg and apt list it, remove it and replace it with a newer version;
+it depends on the
+.Sy brew-
+packages of the formula's dependencies, which
+.Nm
+installs first (marked as installed automatically, for
+.Cm apt autoremove ) ,
+and on the system packages owning the libraries it loads.
+The files keep the names they have in the bottle.
+.Bl -tag -width outdated
+.It Cm install
+Install each
+.Ar formula ,
+or replace an installed one with a newer bottle.
+.It Cm remove , Cm uninstall
+Remove the packages of the formulae
+.Pq Cm dpkg -r .
+.It Cm list
+The installed formulae, their package versions and names.
+.It Cm info
+What the API says of
+.Ar formula ,
+and whether it is installed.
+.It Cm outdated
+The installed formulae the API has a newer bottle of.
+.It Cm upgrade
+Install those newer bottles (of the formulae given, or of all).
+.El
+.Pp
+Options:
+.Bl -tag -width "--keep-deb"
+.It Fl n , Fl -dry-run
+Make the package in
+.Pa /var/cache/piebrew
+and do not install it.
+.It Fl -reinstall
+Install even if the same version is installed.
+.It Fl -force
+Install a bottle that loads a library this system does not have.
+.It Fl -keep-deb
+Keep the package in
+.Pa /var/cache/piebrew .
+.It Fl -tag Ar tag
+Pour the bottle of this tag
+.Pq default: the newest of arm64_tahoe, arm64_sequoia, ..., all .
+.It Fl v
+Say what is fetched and run.
+.El
+.Pp
+A system library a bottle's file loads that this system does not have
+is weak-linked, with a warning, if the file imports nothing from it:
+programs built with gnulib (libunistring, gettext, ...) link CoreServices
+only for Apple's CoreFoundation's sake.
+Otherwise such a bottle is refused, unless
+.Fl -force .
+.Pp
+Post-install steps (Ruby code in a formula) are not run; a formula that
+has one is named.
+Add
+.Pa /opt/homebrew/bin
+to
+.Ev PATH .
+.Sh ENVIRONMENT
+.Bl -tag -width PIEBREW_BOTTLES
+.It Ev PIEBREW_API
+The API's base URL (default https://formulae.brew.sh/api).
+.It Ev PIEBREW_BOTTLES
+Fetch bottles from this URL in place of https://ghcr.io/v2/.
+.It Ev PIEBREW_CACHE
+In place of
+.Pa /var/cache/piebrew .
+.El
+.Sh EXAMPLES
+.Dl piebrew install htop
+.Dl piebrew list
+.Dl dpkg -L brew-htop
+.Dl piebrew upgrade
+.Dl piebrew remove htop && apt-get autoremove
+.Sh SEE ALSO
+.Xr apt-get 8 ,
+.Xr dpkg 1
